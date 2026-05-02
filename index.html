@@ -64,9 +64,35 @@
         .hist span { display: block; font-size: 1rem; font-weight: 600; color: var(--text); margin-top: 4px; }
 
         /* About Modal */
-        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17, 24, 39, 0.4); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: center; padding: 20px; opacity: 0; transition: opacity 0.2s; }
+        #modal-overlay { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background: rgba(17, 24, 39, 0.4); 
+            backdrop-filter: blur(4px); 
+            z-index: 100; 
+            justify-content: center; 
+            align-items: center; 
+            padding: 20px; 
+            opacity: 0; 
+            transition: opacity 0.2s; 
+            overflow-y: auto; 
+        }
         #modal-overlay.active { display: flex; opacity: 1; }
-        .modal { background: #fff; border: 1px solid var(--border); padding: 32px; border-radius: 12px; max-width: 500px; width: 100%; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .modal { 
+            background: #fff; 
+            border: 1px solid var(--border); 
+            padding: 32px; 
+            border-radius: 12px; 
+            max-width: 500px; 
+            width: 100%; 
+            position: relative; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1); 
+            margin: auto; 
+        }
         .modal h2 { margin-bottom: 16px; font-size: 1.25rem; color: var(--text); letter-spacing: -0.01em; }
         .modal p { color: var(--text-m); font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; }
         .modal ul { color: var(--text-m); font-size: 0.9rem; line-height: 1.6; padding-left: 20px; }
@@ -76,6 +102,10 @@
         .close-btn:hover { background: var(--border); color: var(--text); }
 
         /* Desktop Layout */
+        @media (max-width: 600px) {
+            .modal { padding: 24px; padding-top: 60px; }
+            .close-btn { top: 12px; right: 12px; }
+        }
         @media (min-width: 900px) {
             .split { flex-direction: row; justify-content: space-between; align-items: center; }
             .text-block { flex: 1; text-align: left; padding-right: 4rem; }
@@ -134,9 +164,10 @@
             <h2>Technical Methodology</h2>
             <p>Aetherial isolates CPU performance by actively preventing web browsers from taking execution shortcuts.</p>
             <ul>
-                <li><span>JIT Evasion:</span> Browsers use Dead Code Elimination to skip loops. We force calculation by accumulating a mathematically dependent verification checksum.</li>
-                <li><span>Deterministic PRNG:</span> Uses the Mulberry32 algorithm seeded at <code>0xDEADC0DE</code> to guarantee identical mathematical workloads across platforms.</li>
-                <li><span>L1 Cache Locked:</span> The inner loop utilizes zero memory allocation. Execution is constrained entirely to CPU registers and L1 Cache to measure raw silicon speed.</li>
+                <li><span>Hard Serial Dependency:</span> Defeats out-of-order execution by making every memory address dependent on the previous iteration's result. The CPU must finish the entire calculation before it can even calculate the address of the next memory read.</li>
+                <li><span>Pointer Chasing (16MB):</span> Overwhelms L1, L2, and L3 caches using a massive interleaved dependency chain. This forces physical RAM latency (60ns+) into the core loop, grounding performance to the speed of the hardware memory controller.</li>
+                <li><span>FPU Bottleneck:</span> Uses complex transcendental operations (`Math.atan2`, `Math.pow`) and megamorphic dispatch to saturate the CPU's floating-point units and break speculative JIT inlining.</li>
+                <li><span>Deterministic PRNG:</span> Uses the Mulberry32 algorithm seeded at <code>0xDEADC0DE</code>, now interlocked with the memory-dependent pointer state to prevent speculative execution.</li>
                 <li><span>Thermal Stability:</span> Marathon mode calculates stability by dividing the lowest sustained floor by the peak burst. 95%+ indicates excellent cooling.</li>
             </ul>
         </div>
@@ -169,19 +200,90 @@
         };
         updateMem(last); 
 
-        // PRNG (Mulberry32)
-        const prng = a => () => { let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
         const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-        // Core Test
+        // The WebKit Trap: Hard Dependency Chains & Memory Saturation
+        // We use a 16MB ArrayBuffer to completely overwhelm L3 caches and force RAM latency.
+        const heap = new ArrayBuffer(1024 * 1024 * 16); 
+        const u32 = new Uint32Array(heap);
+        
+        // Build a single-cycle permutation for pointer chasing
+        let curr = 0;
+        for(let i=0; i<u32.length; i++) {
+            let next = (Math.imul(curr, 1664525) + 1013904223) >>> 0;
+            u32[curr % u32.length] = next % u32.length;
+            curr = next;
+        }
+
+        const engine = {
+            mix: [
+                (s, it) => Math.imul(s, 31) ^ it,
+                (s, it) => (s >>> 7) ^ (it << 5),
+                (s, it) => Math.imul(it, 17) + s,
+                (s, it) => (s ^ it) ^ 0x55555555,
+                (s, it) => Math.imul(s, it) ^ 0x12345678,
+                (s, it) => (s << 3) ^ (it >>> 2),
+                (s, it) => Math.imul(s ^ it, 13),
+                (s, it) => (s | it) ^ (s & it)
+            ]
+        };
+
         async function runTest(ui) {
             if(ui) stat.innerText = "Warming up..."; await sleep(10);
-            const rand = prng(0xDEADC0DE); for(let i=0; i<100000; i++) Math.sqrt(rand());
+            
+            let seed = 0xDEADC0DE; 
+            const prng = () => { 
+                let t = seed += 0x6D2B79F5; 
+                t = Math.imul(t ^ t >>> 15, t | 1); 
+                t ^= t + Math.imul(t ^ t >>> 7, t | 61); 
+                return ((t ^ t >>> 14) >>> 0) / 4294967296; 
+            };
+
+            for(let i=0; i<10000; i++) Math.sqrt(prng());
+            
             if(ui) stat.innerText = "Sprinting..."; await sleep(10);
             
-            let ops = 0, chkSum = 0, start = performance.now();
-            while(performance.now() - start < 3000) { let v = rand(); chkSum += (v * ops) ^ (v * 1000); ops++; }
-            return { s: Math.floor(ops/3), c: chkSum.toFixed(2) };
+            let opsCount = 0, start = performance.now();
+            let ptrA = 0, ptrB = u32.length >> 1; // Two interleaved chains
+            let chkSum = 1;
+
+            while(performance.now() - start < 3000) { 
+                // 1. Hard Dependent Pointer Chasing
+                // The index for ptrA depends on the result of the previous calculation.
+                // This creates a "Serial Bottleneck" that prevents out-of-order execution.
+                let idxA = (ptrA ^ (chkSum & 0xFF)) % u32.length;
+                ptrA = u32[idxA];
+                
+                // 2. Interleaved Memory Stall
+                let idxB = (ptrB ^ (ptrA & 0xFF)) % u32.length;
+                ptrB = u32[idxB];
+                
+                // 3. Data-Dependent PRNG
+                seed = (seed ^ ptrA ^ ptrB) | 0;
+                let v = prng(); 
+                
+                // 4. Heavy Transcendental Dependency
+                // Math.pow and Math.atan2 force expensive FPU operations
+                let t = Math.atan2(Math.pow(v, 1.1), chkSum || 1);
+                let it = (t * 1000000) | 0;
+
+                // 5. Megamorphic Call
+                let mode = (it ^ opsCount) & 0x7;
+                let payload = engine.mix[mode](chkSum, it);
+
+                // 6. Data-Dependent Inner Loop
+                let innerCount = (ptrB & 0x7) + 1;
+                for (let j = 0; j < innerCount; j++) {
+                    payload = Math.imul(payload, 3) ^ j;
+                }
+
+                // 7. Final Accumulation
+                chkSum = (Math.imul(chkSum, 13) ^ ptrA ^ ptrB ^ payload) | 0;
+                
+                opsCount++; 
+            }
+            
+            return { s: Math.floor(opsCount/3), c: chkSum >>> 0 };
         }
 
         const lock = (on) => { btnS.disabled = btnM.disabled = on; res.style.display = 'flex'; };
