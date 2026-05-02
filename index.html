@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aetherial | Benchmark</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --bg: #ffffff; 
+            --text: #111827; 
+            --text-m: #6b7280; 
+            --border: #e5e7eb;
+            --surf: #f9fafb;
+            --accent: #2563eb; 
+            --danger: #dc2626;
+        }
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+        
+        body { background: var(--bg); color: var(--text); min-height: 100vh; width: 100vw; overflow-x: hidden; display: flex; flex-direction: column; }
+        
+        /* Header & Nav */
+        nav { display: flex; justify-content: space-between; align-items: center; padding: 2rem 5%; flex-shrink: 0; border-bottom: 1px solid transparent; }
+        .logo { font-weight: 700; font-size: 1.2rem; letter-spacing: 1px; color: var(--text); }
+        .nav-btn { background: none; border: none; color: var(--text-m); font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: color 0.2s; }
+        .nav-btn:hover { color: var(--text); }
+
+        /* Main Layout */
+        main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem 5%; }
+        .split { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 1050px; gap: 4rem; }
+        
+        .text-block { text-align: center; max-width: 600px; }
+        h1 { font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 700; line-height: 1.1; margin-bottom: 1rem; letter-spacing: -0.02em; color: var(--text); }
+        p { font-size: clamp(1rem, 1.5vw, 1.1rem); color: var(--text-m); line-height: 1.6; }
+
+        .interaction { width: 100%; max-width: 450px; display: flex; flex-direction: column; gap: 16px; }
+        
+        /* Buttons */
+        .btns { display: flex; gap: 12px; }
+        button.action-btn { flex: 1; padding: 14px; font-size: 0.95rem; font-weight: 600; color: #fff; background: #111827; border: 1px solid #111827; border-radius: 8px; cursor: pointer; transition: all 0.15s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        button.action-btn:hover:not(:disabled) { background: #374151; border-color: #374151; }
+        button.action-btn.sec { background: #fff; color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+        button.action-btn.sec:hover:not(:disabled) { background: var(--surf); }
+        button.action-btn:active { transform: scale(0.98); }
+        button.action-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* Results Box */
+        #res { display: none; flex-direction: column; gap: 8px; padding: 24px; background: #fff; border: 1px solid var(--border); border-radius: 12px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.03); }
+        .status { font-size: 0.75rem; color: var(--text-m); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+        .score { font-size: clamp(2rem, 5vw, 2.8rem); font-weight: 700; color: var(--text); margin: 4px 0; letter-spacing: -0.02em; }
+        .score.drop { color: var(--danger); }
+        .check { font-size: 0.8rem; color: var(--text-m); font-family: monospace; }
+
+        /* Advanced Grid Stats */
+        .grid { display: none; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; padding-top: 20px; border-top: 1px solid var(--border); }
+        .box { background: var(--surf); padding: 12px; border-radius: 8px; border: 1px solid var(--border); }
+        .box label { display: block; font-size: 0.7rem; color: var(--text-m); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+        .box span { display: block; font-size: 1.1rem; font-weight: 700; margin-top: 6px; color: var(--text); }
+        .runs { grid-column: span 2; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+        .runs span { background: var(--surf); border: 1px solid var(--border); padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; color: var(--text-m); font-family: monospace; }
+        
+        .hist { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-m); border-top: 1px solid var(--border); padding-top: 20px; margin-top: 8px; text-align: left; }
+        .hist div:nth-child(2) { text-align: center; } .hist div:last-child { text-align: right; }
+        .hist span { display: block; font-size: 1rem; font-weight: 600; color: var(--text); margin-top: 4px; }
+
+        /* About Modal */
+        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(17, 24, 39, 0.4); backdrop-filter: blur(4px); z-index: 100; justify-content: center; align-items: center; padding: 20px; opacity: 0; transition: opacity 0.2s; }
+        #modal-overlay.active { display: flex; opacity: 1; }
+        .modal { background: #fff; border: 1px solid var(--border); padding: 32px; border-radius: 12px; max-width: 500px; width: 100%; position: relative; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .modal h2 { margin-bottom: 16px; font-size: 1.25rem; color: var(--text); letter-spacing: -0.01em; }
+        .modal p { color: var(--text-m); font-size: 0.95rem; line-height: 1.6; margin-bottom: 20px; }
+        .modal ul { color: var(--text-m); font-size: 0.9rem; line-height: 1.6; padding-left: 20px; }
+        .modal li { margin-bottom: 8px; }
+        .modal li span { color: var(--text); font-weight: 600; }
+        .close-btn { position: absolute; top: 20px; right: 20px; background: var(--surf); border: 1px solid var(--border); color: var(--text-m); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+        .close-btn:hover { background: var(--border); color: var(--text); }
+
+        /* Desktop Layout */
+        @media (min-width: 900px) {
+            .split { flex-direction: row; justify-content: space-between; align-items: center; }
+            .text-block { flex: 1; text-align: left; padding-right: 4rem; }
+            .interaction { flex: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">Aetherial.</div>
+        <button id="about-trigger" class="nav-btn">Methodology</button>
+    </nav>
+
+    <main>
+        <div class="split">
+            <div class="text-block">
+                <h1>A simple Benchmark.</h1>
+                <p>Find out your device's peak execution speed, and see how it holds up under pressure.</p>
+            </div>
+            
+            <div class="interaction">
+                <div class="btns">
+                    <button id="btn-s" class="action-btn">Sprint (3s)</button>
+                    <button id="btn-m" class="action-btn sec">Marathon (12x)</button>
+                </div>
+                
+                <div id="res">
+                    <div id="status" class="status">Testing</div>
+                    <div id="score" class="score">--</div>
+                    <div id="check" class="check">--</div>
+                    
+                    <!-- Advanced Marathon Stats -->
+                    <div id="grid" class="grid">
+                        <div class="box"><label>Peak Burst</label><span id="m-peak">--</span></div>
+                        <div class="box"><label>Sustained Floor</label><span id="m-floor">--</span></div>
+                        <div class="box"><label>Average Run</label><span id="m-avg">--</span></div>
+                        <div class="box"><label>Thermal Stability</label><span id="m-stab">--</span></div>
+                        <div id="m-runs" class="runs"></div>
+                    </div>
+
+                    <div class="hist">
+                        <div>Last<span id="h-last">--</span></div>
+                        <div>Global Avg<span id="h-avg">--</span></div>
+                        <div>Best<span id="h-best" style="color:var(--accent);">--</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Technical Specs Modal -->
+    <div id="modal-overlay">
+        <div class="modal">
+            <button id="close-modal" class="close-btn">✕</button>
+            <h2>Technical Methodology</h2>
+            <p>Aetherial isolates CPU performance by actively preventing web browsers from taking execution shortcuts.</p>
+            <ul>
+                <li><span>JIT Evasion:</span> Browsers use Dead Code Elimination to skip loops. We force calculation by accumulating a mathematically dependent verification checksum.</li>
+                <li><span>Deterministic PRNG:</span> Uses the Mulberry32 algorithm seeded at <code>0xDEADC0DE</code> to guarantee identical mathematical workloads across platforms.</li>
+                <li><span>L1 Cache Locked:</span> The inner loop utilizes zero memory allocation. Execution is constrained entirely to CPU registers and L1 Cache to measure raw silicon speed.</li>
+                <li><span>Thermal Stability:</span> Marathon mode calculates stability by dividing the lowest sustained floor by the peak burst. 95%+ indicates excellent cooling.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const $ = id => document.getElementById(id);
+        const [btnS, btnM, res, stat, sc, chk, grid, mPeak, mFloor, mAvg, mStab, mRuns, hLast, hAvg, hBest] = 
+              ['btn-s','btn-m','res','status','score','check','grid','m-peak','m-floor','m-avg','m-stab','m-runs','h-last','h-avg','h-best'].map($);
+
+        // Modal Logic
+        const overlay = $('modal-overlay');
+        $('about-trigger').onclick = () => overlay.classList.add('active');
+        $('close-modal').onclick = () => overlay.classList.remove('active');
+        overlay.onclick = (e) => { if(e.target === overlay) overlay.classList.remove('active'); };
+
+        // Memory State
+        let best = +localStorage.getItem('aeth_b') || 0, 
+            last = +localStorage.getItem('aeth_l') || 0, 
+            gAvg = +localStorage.getItem('aeth_a') || 0, 
+            count = +localStorage.getItem('aeth_c') || 0;
+
+        const fmt = n => (n/1000).toFixed(1) + 'k';
+        const updateMem = n => {
+            gAvg += (n - gAvg) / (++count); last = n; if(n > best) best = n;
+            localStorage.setItem('aeth_c', count); localStorage.setItem('aeth_a', gAvg);
+            localStorage.setItem('aeth_l', last); localStorage.setItem('aeth_b', best);
+            hLast.innerText = fmt(last); hBest.innerText = fmt(best); hAvg.innerText = fmt(gAvg);
+        };
+        updateMem(last); 
+
+        // PRNG (Mulberry32)
+        const prng = a => () => { let t = a += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        // Core Test
+        async function runTest(ui) {
+            if(ui) stat.innerText = "Warming up..."; await sleep(10);
+            const rand = prng(0xDEADC0DE); for(let i=0; i<100000; i++) Math.sqrt(rand());
+            if(ui) stat.innerText = "Sprinting..."; await sleep(10);
+            
+            let ops = 0, chkSum = 0, start = performance.now();
+            while(performance.now() - start < 3000) { let v = rand(); chkSum += (v * ops) ^ (v * 1000); ops++; }
+            return { s: Math.floor(ops/3), c: chkSum.toFixed(2) };
+        }
+
+        const lock = (on) => { btnS.disabled = btnM.disabled = on; res.style.display = 'flex'; };
+
+        btnS.onclick = async () => {
+            lock(true); grid.style.display = 'none'; sc.className = 'score'; sc.innerText = 'Testing...';
+            const {s, c} = await runTest(true);
+            updateMem(s);
+            stat.innerText = "Sprint Complete"; sc.innerText = s.toLocaleString(); chk.innerText = `CHK: ${c}`;
+            lock(false);
+        };
+
+        btnM.onclick = async () => {
+            lock(true); grid.style.display = 'grid'; mRuns.innerHTML = ''; sc.className = 'score'; 
+            let scores = [], sum = 0, finalC = 0;
+
+            for(let i=1; i<=12; i++) {
+                stat.innerText = `Marathon: Run ${i}/12`; sc.innerText = 'Testing...';
+                const {s, c} = await runTest(false);
+                scores.push(s); sum += s; finalC = c; 
+                
+                // Live Stat Updates
+                let curPeak = Math.max(...scores);
+                let curFloor = Math.min(...scores);
+                mPeak.innerText = fmt(curPeak);
+                mFloor.innerText = fmt(curFloor);
+                mAvg.innerText = fmt(Math.floor(sum/i));
+                mStab.innerText = ((curFloor / curPeak) * 100).toFixed(1) + '%';
+                
+                mRuns.innerHTML += `<span>${fmt(s)}</span>`;
+                updateMem(s); await sleep(100); 
+            }
+
+            let peak = Math.max(...scores);
+            let floor = Math.min(...scores);
+            let stability = (floor / peak) * 100;
+            
+            stat.innerText = "Marathon Complete"; 
+            sc.innerText = Math.floor(sum/12).toLocaleString(); 
+            chk.innerText = `CHK: ${finalC}`;
+            
+            if(stability < 85) { mStab.style.color = 'var(--danger)'; sc.classList.add('drop'); } else { mStab.style.color = 'var(--text)'; }
+            lock(false);
+        };
+    </script>
+</body>
+</html>
