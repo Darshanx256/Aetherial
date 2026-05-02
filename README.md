@@ -21,11 +21,8 @@ Modern browser engines utilize JIT compilation and Dead Code Elimination to bypa
 * **Sustained Floor:** Lowest recorded throughput during a marathon run.
 * **Thermal Stability:** Ratio of Sustained Floor to Peak Burst. High percentages (>90%) indicate effective cooling and minimal thermal throttling.
 
-## Setup
+## Run the Benchmark
 
-Aetherial is self-contained and requires no dependencies.
+Aetherial is fully self-contained and runs directly in your browser. 
 
-1. Clone the repository.
-2. Open `index.html` in a modern browser.
-
-*Note: For precise bare-metal testing, execute in a private/incognito window with all browser extensions disabled.*
+**[Run Aetherial Live](https://darshanx256.github.io/Aetherial/)**
